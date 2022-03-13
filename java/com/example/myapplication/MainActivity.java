@@ -1,54 +1,53 @@
 package com.example.myapplication;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 
+@RequiresApi(api = Build.VERSION_CODES.S)
 public class MainActivity extends AppCompatActivity {
     BluetoothAdapter btAdapter;
     BluetoothManager btManager;
     BluetoothLeScanner btScanner;
-    private final static int REQUEST_ENABLE_BT = 1;
-    private final int BLUETOOTH_CONNECT_PERMISSION_CODE = 1;
-    private final int BLUETOOTH_PERMISSION_CODE         = 2;
-    private final int BLUETOOTH_SCAN_PERMISSION_CODE    = 3;
-    private volatile boolean isPermissionInProgress = false;
+    private final int BLUETOOTH_PERMISSION_CODE = 1;
+
+    String[] PERMISSIONS = {
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_SCAN
+    };
+    String[] PermissionsNeeded = new String[PERMISSIONS.length];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        int Counter; //used to index an array to copy over the permissions that need approval
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         btManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         btAdapter = btManager.getAdapter();
         btScanner = btAdapter.getBluetoothLeScanner();
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED){
-            System.out.println("Permission is already granted.\n");
-        }else{
-            isPermissionInProgress = true;
-            requestBluetoothConnectPermission();
-            wait();
+        Counter = 0;
+        for (String permission : PERMISSIONS) {
+            if (!(ContextCompat.checkSelfPermission(MainActivity.this,
+                    Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)) {
+                PermissionsNeeded[Counter] = permission;
+                Counter++;
+            }
         }
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED){
-            System.out.println("Permission is already granted.\n");
-        }else{
-            requestBluetoothPermission();
-        }
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED){
-            System.out.println("Permission is already granted.\n");
-        }else{
-            requestBluetoothScanPermission();
-        }
+        requestPermissions();
+
+
     }
 
     public void ScanBLE(View view) {
@@ -79,29 +78,35 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void requestBluetoothConnectPermission(){
-        ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH_CONNECT}, BLUETOOTH_CONNECT_PERMISSION_CODE);
-    }
-
-    private void requestBluetoothPermission(){
-        ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH}, BLUETOOTH_PERMISSION_CODE);
-    }
-
-    private void requestBluetoothScanPermission(){
-        ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.BLUETOOTH_SCAN}, BLUETOOTH_SCAN_PERMISSION_CODE);
+    private void requestPermissions() {
+        ActivityCompat.requestPermissions(this, PermissionsNeeded, BLUETOOTH_PERMISSION_CODE);
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-            if (grantResults.length > 0
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                System.out.println(grantResults);
-                System.out.println("Permission has been granted\n");
+            if (grantResults.length > 0){
+                if (grantResults.length == 1) {
+                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        System.out.println("Permission has been granted\n");
+                    }else{
+                        closeApp();
+                    }
+                }else if (grantResults.length == 2) {
+                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED
+                     && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                        System.out.println("Permission has been granted\n");
+                    }else{
+                        closeApp();
+                    }
+                }
             } else {
-                System.out.println("Permission has been denied\n");
-                MainActivity.this.finish();
+                closeApp();
             }
-        isPermissionInProgress = false;
+    }
+
+    public void closeApp() {
+        System.out.println("Permission has been denied\n");
+        MainActivity.this.finish();
     }
 }
