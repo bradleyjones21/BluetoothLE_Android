@@ -67,8 +67,9 @@
         android:id="@+id/imageView"
         android:layout_width="332dp"
         android:layout_height="224dp"
-        android:layout_marginTop="100dp"
+        android:layout_marginTop="28dp"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.468"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@drawable/lslogo" />
@@ -83,4 +84,5 @@
         android:onClick="ScanBLE"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
