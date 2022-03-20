@@ -1,45 +1,46 @@
 package com.example.myapplication;
 
+import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothSocket;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import android.Manifest;
-import android.bluetooth.BluetoothSocket;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.pm.PackageManager;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.HandlerThread;
-import android.util.Log;
-import android.view.View;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothDevice;
-
-import android.bluetooth.le.BluetoothLeScanner;
-
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Set;
 import java.util.UUID;
 
-import android.os.HandlerThread;
-
 @RequiresApi(api = 23)
 public class MainActivity extends AppCompatActivity {
-    BluetoothAdapter btAdapter;
     BluetoothManager btManager;
     BluetoothLeScanner btScanner;
+    BluetoothSocket btSocket0;
+    BluetoothSocket btSocket1;
+    BluetoothSocket btSocket2;
+    BluetoothSocket btSocket3;
+    BluetoothSocket btSocket4;
+    BluetoothSocket btSocket5;
+    int socketCounter = 0;
     private final int BLUETOOTH_PERMISSION_CODE = 1;
     public final boolean PAIRING = false;
-    public ArrayList<BluetoothDevice> btDevices = new ArrayList<>();
+    public boolean PERMISSION = false;
+    //public ArrayList<BluetoothDevice> btDevices = new ArrayList<>();
     private static final String TAG = "MyActivity";
     private static final String SLAVE_NAME = "JDY-16";
     private static final String SLAVE_PW = "123456";
@@ -48,13 +49,15 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.READ_PHONE_STATE
     };
     String[] PermissionsNeeded = new String[PERMISSIONS.length];
     public boolean isFirstScan = true;
-    public int debug = 0;
-
+    public int debug = 0; //just to use as a variable to add breakpoints
+    private static final UUID MY_UUID_INSECURE =
+            UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private static final UUID MY_UUID_SECURE = UUID.randomUUID();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,61 +83,84 @@ public class MainActivity extends AppCompatActivity {
         } else {
             enableBT();
         }
-    }
-
-    private class ConnectThread extends Thread {
-        private BluetoothSocket mmSocket;
-
-        public ConnectThread(BluetoothDevice device, UUID uuid) {
-            Log.d(TAG, "ConnectThread: started.");
-            mmDevice = device;
-            deviceUUID = uuid;
+        ///////////////////////////////////
+        //connect devices
+        Log.d(TAG, "Checking permissions\n");
+        if (!btAdapter.isEnabled()) {
+            enableBT();
+        }
+        if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
+                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
+                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
+            PERMISSION = true; //Permission is now available for all other tasks
+            if (btAdapter.isDiscovering()) {
+                btAdapter.cancelDiscovery();
+                Log.d(TAG, "Cancelling discovery\n");
+            }
+        } else {
+            Log.d(TAG, "No permission exiting app\n");
+            closeApp();
         }
 
-        public void run(){
-            BluetoothSocket tmp = null;
-            Log.i(TAG, "RUN mConnectThread ");
-
-            // Get a BluetoothSocket for a connection with the
-            // given BluetoothDevice
-            try {
-                Log.d(TAG, "ConnectThread: Trying to create InsecureRfcommSocket using UUID: "
-                        +MY_UUID_INSECURE );
-                tmp = mmDevice.createRfcommSocketToServiceRecord(MY_UUID_INSECURE);
-            } catch (IOException e) {
-                Log.e(TAG, "ConnectThread: Could not create InsecureRfcommSocket " + e.getMessage());
-            }
-
-            mmSocket = tmp;
-
-            // Make a connection to the BluetoothSocket
-
-            try {
-                // This is a blocking call and will only return on a
-                // successful connection or an exception
-                mmSocket.connect();
-
-            } catch (IOException e) {
-                // Close the socket
-                try {
-                    mmSocket.close();
-                    Log.d(TAG, "run: Closed Socket.");
-                } catch (IOException e1) {
-                    Log.e(TAG, "mConnectThread: run: Unable to close connection in socket " + e1.getMessage());
+        Log.d(TAG, "===> Start Server !");
+        //Log.d(TAG, toString(btDevicesPaired));
+        Intent intent = getIntent();
+        String address = intent.getStringExtra("3CA5518AD35C");
+        startActivity(intent);
+        try {
+            // This will connect the device with address as passed
+            Set<BluetoothDevice> btDevices = btAdapter.getBondedDevices();
+            for(BluetoothDevice btDevice : btDevices)
+                switch(socketCounter){
+                    case 0:
+                        Log.d(TAG, "socket 0");
+                        btSocket0 = btDevice.createRfcommSocketToServiceRecord(MY_UUID_SECURE);
+                        btAdapter.listenUsingRfcommWithServiceRecord(MY_UUID_SECURE.fromString());
+                        //btSocket0 = btDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID_INSECURE);
+                        //btSocket0 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
+                        btAdapter.cancelDiscovery();
+                        btSocket0.connect();
+                        break;
+                    case 1:
+                        Log.d(TAG, "socket 1");
+                        btSocket1 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
+                        btAdapter.cancelDiscovery();
+                        btSocket1.connect();
+                        break;
+                    case 2:
+                        Log.d(TAG, "socket 2");
+                        btSocket2 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
+                        btAdapter.cancelDiscovery();
+                        btSocket2.connect();
+                        break;
+                    case 3:
+                        Log.d(TAG, "socket 3");
+                        btSocket3 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
+                        btAdapter.cancelDiscovery();
+                        btSocket3.connect();
+                        break;
+                    case 4:
+                        Log.d(TAG, "socket 4");
+                        btSocket4 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
+                        btAdapter.cancelDiscovery();
+                        btSocket4.connect();
+                        break;
+                    case 5:
+                        Log.d(TAG, "socket 5");
+                        btSocket5 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
+                        btAdapter.cancelDiscovery();
+                        btSocket5.connect();
+                        break;
                 }
-                Log.d(TAG, "run: ConnectThread: Could not connect to UUID: " + MY_UUID_INSECURE );
-            }
+                socketCounter++;
 
-            //will talk about this in the 3rd video
-            connected(mmSocket);
+
+                Log.d(TAG, "===> Device Connected !");
+
         }
-        public void cancel() {
-            try {
-                Log.d(TAG, "cancel: Closing Client Socket.");
-                mmSocket.close();
-            } catch (IOException e) {
-                Log.e(TAG, "cancel: close() of mmSocket in Connectthread failed. " + e.getMessage());
-            }
+        catch (IOException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e ){
+            e.printStackTrace();
+            Log.d(TAG, "===> ERROR!");
         }
     }
 
@@ -195,212 +221,97 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    //Broadcast receiver for devices that are not yet paired
-    private final BroadcastReceiver BroadcastReceiver2 = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
 
+    public void ScanBLE(View view) {
+        isFirstScan = true;
 
-            final String action = intent.getAction();
-            Log.d(TAG, "Action found\n");
-            if (action.equals(BluetoothDevice.ACTION_FOUND)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED) {
-                    Log.d(TAG, "onReceive: " + device.getName() + ":" + device.getAddress());
-                    if (device.getName() != null) {
-                        if (device.getName().equals(SLAVE_NAME)) {//JDY-16
-                            btDevices.add(device);
-                            if (PAIRING) {
-                                if (device.getBondState() == BluetoothDevice.BOND_NONE) {
-                                    if (btAdapter.isDiscovering()) {
-                                        btAdapter.cancelDiscovery();
-                                        Log.d(TAG, "Cancelled discovery");
-                                    }
-                                    device.createBond();
-                                    Log.d(TAG, "Creating bond");
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Log.d(TAG, "Do not have permission");
-                    closeApp();
-                }
-            }
-
-            if (isFirstScan) {
-
-                thread = new Thread(new Runnable() {//62747f5
-                    @Override
-                    public void run() {
-                        if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED) {
-                            try {
-                                Thread.sleep(2000);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            btAdapter.cancelDiscovery();
-                            debug = 1;
-                        }
-                    }
-                });
-                thread.start();
-                thread.run();
-                isFirstScan = false;
-            }
-
+        Log.d(TAG, "Button ScanBLE Pressed\n");
+        if (!btAdapter.isEnabled()) {
+            enableBT();
         }
-    };
-
-
-        //For receiving pairing requests
-        private final BroadcastReceiver PairingRequest = new BroadcastReceiver() {
-
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", 0);
-                //the pin in case you need to accept for an specific pin
-                Log.d("PIN", " " + intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", 0));
-                //maybe you look for a name or address
-                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED) {
-                    Log.d("Bonded", device.getName());
-                    byte[] pinBytes;
-                    try {
-                        pinBytes = ("" + pin).getBytes("UTF-8");
-                        device.setPin(pinBytes);
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                    }
-                }
-                //loop checks every 100ms if the device is connected with a timeout of 10sec until it keeps looking
-                thread = new Thread(new Runnable() {//62747f5
-                    @Override
-                    public void run() {
-                        int x = 0;
-                        if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED) {
-                            for (int ii = 0; ii < 100; ii++) {
-                                x = device.getBondState(); //just for debugging
-                                if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-                                    Log.d(TAG, "Break device connected, from thread");
-
-                                    break;
-                                }
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        }
-                        enableBT();
-                        if (!btAdapter.isDiscovering()) {
-                            btAdapter.startDiscovery();
-                            Log.d(TAG, "Starting discovery, from thread");
-                        }
-                    }
-                });
-                thread.start();
-                thread.run();
+        Log.d(TAG, "Looking for unpaired devices\n");
+        if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
+                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
+                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
+            if (btAdapter.isDiscovering()) {
+                btAdapter.cancelDiscovery();
+                Log.d(TAG, "Cancelling discovery\n");
             }
-        };
+            Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
+            Log.d(TAG, "Starting discovery\n");
 
-
-        public void ScanBLE(View view) {
-            isFirstScan = true;
-
-            Log.d(TAG, "Button ScanBLE Pressed\n");
-            if (!btAdapter.isEnabled()) {
-                enableBT();
-            }
-            Log.d(TAG, "Looking for unpaired devices\n");
-            if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
-                    (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
-                    (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
-                if (btAdapter.isDiscovering()) {
-                    btAdapter.cancelDiscovery();
-                    Log.d(TAG, "Cancelling discovery\n");
-                }
-                Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
-                Log.d(TAG, "Starting discovery\n");
-                if(PAIRING) {
-                    btAdapter.startDiscovery();
-                    IntentFilter discoverDevicesIntent = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-                    registerReceiver(BroadcastReceiver2, discoverDevicesIntent);
-                }
-                //IntentFilter pairDeviceIntent = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
-                //registerReceiver(PairingRequest, pairDeviceIntent);
-            } else {
-                Log.d(TAG, "No scanning permission\n");
-            }
-
-
-            //here we need to scan for the JDY16's and connect them
+            //IntentFilter pairDeviceIntent = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
+            //registerReceiver(PairingRequest, pairDeviceIntent);
+        } else {
+            Log.d(TAG, "No scanning permission\n");
         }
 
-        public void ToggleLED(View view) {
-            if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
-                    (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
-                    (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
 
-                Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
-                switch (view.getId()) {
-                    case (R.id.toggleButton):
-                        Log.d(TAG, "Button LED1 Pressed\n");
-                        btDevicesPaired[0]
-                        //send toggle message to connection 1
-                        break;
-                    case (R.id.toggleButton2):
-                        Log.d(TAG, "Button LED2 Pressed\n");
-                        //send toggle message to connection 2
-                        break;
-                    case (R.id.toggleButton3):
-                        Log.d(TAG, "Button LED3 Pressed\n");
-                        //send toggle message to connection 3
-                        break;
-                }
-            }else{
-                Log.d(TAG, "No BLE permission in toggle LED\n");
+        //here we need to scan for the JDY16's and connect them
+    }
+
+    public void ToggleLED(View view) {
+        if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
+                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
+                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
+
+            Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
+            switch (view.getId()) {
+                case (R.id.toggleButton):
+                    Log.d(TAG, "Button LED1 Pressed\n");
+                    //send toggle message to connection 1
+                    break;
+                case (R.id.toggleButton2):
+                    Log.d(TAG, "Button LED2 Pressed\n");
+                    //send toggle message to connection 2
+                    break;
+                case (R.id.toggleButton3):
+                    Log.d(TAG, "Button LED3 Pressed\n");
+                    //send toggle message to connection 3
+                    break;
             }
-        }
-
-        @Override
-        public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-            if (grantResults.length > 0) {
-                if (grantResults.length == 1) {
-                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                        Log.d(TAG, "Permission has been granted\n");
-                        enableBT();
-                    } else {
-                        //closeApp();
-                    }
-                } else if (grantResults.length == 2) {
-                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED
-                            && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
-                        Log.d(TAG, "Permission has been granted\n");
-                        enableBT();
-                    } else {
-                        //closeApp();
-                    }
-                }
-            } else {
-                //closeApp();
-            }
-        }
-
-        public void closeApp() {
-            Log.d(TAG, "Permission has been denied\n");
-            MainActivity.this.finish();
-        }
-
-        @Override
-        protected void onDestroy() {
-            super.onDestroy();
-            try {
-                unregisterReceiver(BroadcastReceiver1);
-            } catch (Exception e) {
-                Log.d(TAG, "Receiver does not exist\n");
-            }
+        }else{
+            Log.d(TAG, "No BLE permission in toggle LED\n");
         }
     }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (grantResults.length > 0) {
+            if (grantResults.length == 1) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "Permission has been granted\n");
+                    enableBT();
+                } else {
+                    //closeApp();
+                }
+            } else if (grantResults.length == 2) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED
+                        && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "Permission has been granted\n");
+                    enableBT();
+                } else {
+                    //closeApp();
+                }
+            }
+        } else {
+            //closeApp();
+        }
+    }
+
+    public void closeApp() {
+        Log.d(TAG, "Permission has been denied\n");
+        MainActivity.this.finish();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            unregisterReceiver(BroadcastReceiver1);
+        } catch (Exception e) {
+            Log.d(TAG, "Receiver does not exist\n");
+        }
+    }
+}
