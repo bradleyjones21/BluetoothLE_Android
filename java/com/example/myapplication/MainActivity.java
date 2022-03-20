@@ -3,7 +3,10 @@ package com.example.myapplication;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothSocket;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.content.BroadcastReceiver;
@@ -21,8 +24,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,12 +31,14 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity {
     BluetoothManager btManager;
     BluetoothLeScanner btScanner;
+    BluetoothAdapter btAdapter;
     BluetoothSocket btSocket0;
     BluetoothSocket btSocket1;
     BluetoothSocket btSocket2;
     BluetoothSocket btSocket3;
     BluetoothSocket btSocket4;
     BluetoothSocket btSocket5;
+    private BluetoothGatt btGatt;
     int socketCounter = 0;
     private final int BLUETOOTH_PERMISSION_CODE = 1;
     public final boolean PAIRING = false;
@@ -66,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         btManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        btAdapter = btManager.getAdapter();
+        BluetoothAdapter btAdapter = btManager.getAdapter();
         btScanner = btAdapter.getBluetoothLeScanner();
         Counter = 0;
         for (String permission : PERMISSIONS) {
@@ -110,55 +113,27 @@ public class MainActivity extends AppCompatActivity {
         try {
             // This will connect the device with address as passed
             Set<BluetoothDevice> btDevices = btAdapter.getBondedDevices();
-            for(BluetoothDevice btDevice : btDevices)
-                switch(socketCounter){
-                    case 0:
-                        Log.d(TAG, "socket 0");
-                        btSocket0 = btDevice.createRfcommSocketToServiceRecord(MY_UUID_SECURE);
-                        btAdapter.listenUsingRfcommWithServiceRecord(MY_UUID_SECURE.fromString());
-                        //btSocket0 = btDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID_INSECURE);
-                        //btSocket0 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
-                        btAdapter.cancelDiscovery();
-                        btSocket0.connect();
-                        break;
-                    case 1:
-                        Log.d(TAG, "socket 1");
-                        btSocket1 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
-                        btAdapter.cancelDiscovery();
-                        btSocket1.connect();
-                        break;
-                    case 2:
-                        Log.d(TAG, "socket 2");
-                        btSocket2 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
-                        btAdapter.cancelDiscovery();
-                        btSocket2.connect();
-                        break;
-                    case 3:
-                        Log.d(TAG, "socket 3");
-                        btSocket3 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
-                        btAdapter.cancelDiscovery();
-                        btSocket3.connect();
-                        break;
-                    case 4:
-                        Log.d(TAG, "socket 4");
-                        btSocket4 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
-                        btAdapter.cancelDiscovery();
-                        btSocket4.connect();
-                        break;
-                    case 5:
-                        Log.d(TAG, "socket 5");
-                        btSocket5 =(BluetoothSocket) btDevice.getClass().getMethod("createInsecureRfcommSocket", new Class[] {int.class}).invoke(btDevice,1);
-                        btAdapter.cancelDiscovery();
-                        btSocket5.connect();
-                        break;
-                }
-                socketCounter++;
-
-
-                Log.d(TAG, "===> Device Connected !");
-
+            for(BluetoothDevice btDevice : btDevices) {
+                Log.d(TAG, "socket 0");
+                btDevice.connectGatt(MainActivity.this, true, new BluetoothGattCallback() {
+                    @Override
+                    public void onConnectionStateChange(BluetoothGatt
+                                                                gatt, int status, int newState) {
+                        super.onConnectionStateChange(gatt, status, newState);
+                        switch (newState) {
+                            case BluetoothProfile.STATE_CONNECTED:
+                                Log.d("GattCallback", "connected");
+                                gatt.getServices();
+                                break;
+                            case BluetoothProfile.STATE_DISCONNECTED:
+                                Log.d("GattCallback", "Disconnected");
+                                break;
+                        }
+                    }
+                });
+            }
         }
-        catch (IOException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e ){
+        catch (Exception e){
             e.printStackTrace();
             Log.d(TAG, "===> ERROR!");
         }
