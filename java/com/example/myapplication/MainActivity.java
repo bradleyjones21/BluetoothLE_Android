@@ -5,6 +5,8 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothSocket;
@@ -24,6 +26,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,6 +36,13 @@ public class MainActivity extends AppCompatActivity {
     BluetoothManager btManager;
     BluetoothLeScanner btScanner;
     BluetoothAdapter btAdapter;
+    List<BluetoothGattService> testServices;
+    BluetoothGatt btGatt0;
+    BluetoothGatt btGatt1;
+    BluetoothGatt btGatt2;
+    BluetoothGatt btGatt3;
+    BluetoothGatt btGatt4;
+    BluetoothGatt btGatt5;
     BluetoothSocket btSocket0;
     BluetoothSocket btSocket1;
     BluetoothSocket btSocket2;
@@ -39,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
     BluetoothSocket btSocket4;
     BluetoothSocket btSocket5;
     private BluetoothGatt btGatt;
-    int socketCounter = 0;
+    int gattCounter = 0;
     private final int BLUETOOTH_PERMISSION_CODE = 1;
     public final boolean PAIRING = false;
     public boolean PERMISSION = false;
@@ -61,6 +72,9 @@ public class MainActivity extends AppCompatActivity {
     private static final UUID MY_UUID_INSECURE =
             UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final UUID MY_UUID_SECURE = UUID.randomUUID();
+    public final static String ACTION_GATT_SERVICES_DISCOVERED =
+            "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
+    public final int READ_DATA = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,22 +129,27 @@ public class MainActivity extends AppCompatActivity {
             Set<BluetoothDevice> btDevices = btAdapter.getBondedDevices();
             for(BluetoothDevice btDevice : btDevices) {
                 Log.d(TAG, "socket 0");
-                btDevice.connectGatt(MainActivity.this, true, new BluetoothGattCallback() {
-                    @Override
-                    public void onConnectionStateChange(BluetoothGatt
-                                                                gatt, int status, int newState) {
-                        super.onConnectionStateChange(gatt, status, newState);
-                        switch (newState) {
-                            case BluetoothProfile.STATE_CONNECTED:
-                                Log.d("GattCallback", "connected");
-                                gatt.getServices();
-                                break;
-                            case BluetoothProfile.STATE_DISCONNECTED:
-                                Log.d("GattCallback", "Disconnected");
-                                break;
-                        }
-                    }
-                });
+                switch(gattCounter){
+                    case(0):
+                        btGatt0 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        break;
+                    case(1):
+                        btGatt1 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        break;
+                    case(2):
+                        btGatt2 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        break;
+                    case(3):
+                        btGatt3 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        break;
+                    case(4):
+                        btGatt4 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        break;
+                    case(5):
+                        btGatt5 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        break;
+                }
+                gattCounter++;
             }
         }
         catch (Exception e){
@@ -138,6 +157,48 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "===> ERROR!");
         }
     }
+
+    public BluetoothGattCallback btGattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange (BluetoothGatt gatt,int status, int newState){
+            super.onConnectionStateChange(gatt, status, newState);
+            switch (newState) {
+                case BluetoothProfile.STATE_CONNECTED:
+                    Log.d("GattCallback", "connected");
+
+                    gatt.discoverServices();
+
+                    break;
+                case BluetoothProfile.STATE_DISCONNECTED:
+                    Log.d("GattCallback", "Disconnected");
+                    break;
+            }
+        }
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                testServices = gatt.getServices();
+                debug++;
+            } else {
+                Log.w(TAG, "onServicesDiscovered received: " + status);
+            }
+        }
+        @Override
+        public void onCharacteristicRead(
+                BluetoothGatt gatt,
+                BluetoothGattCharacteristic characteristic,
+                int status
+        ) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "onCharacteristicRead SUCCESS");
+                String ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
+                ;
+                broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            } else {
+                Log.d(TAG, "onCharacteristicRead FAILED");
+            }
+        }
+    };
 
     public void enableBT() {
         if (btAdapter == null) {
@@ -226,15 +287,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void ToggleLED(View view) {
+        String uuid = null;
         if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
                 (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
                 (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
 
-            Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
+            //Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
             switch (view.getId()) {
                 case (R.id.toggleButton):
+                    HashMap<String, String> currentCharaData =
+                            new HashMap<String, String>();
+                    String unknownCharaString = getResources().
+                            getString(R.string.unknown_characteristic);
                     Log.d(TAG, "Button LED1 Pressed\n");
                     //send toggle message to connection 1
+                    BluetoothGattService Service = testServices.get(0);
+                    uuid = Service.getUuid().toString();
+
+                    Log.d(TAG, "uuid: " + uuid);
+                    List<BluetoothGattCharacteristic> gattCharacteristics = Service.getCharacteristics();
+                    btGatt0.readCharacteristic(gattCharacteristics.get(0));
+                    Log.d(TAG, "chara: " + gattCharacteristics.get(0));
+                    debug++;
+
                     break;
                 case (R.id.toggleButton2):
                     Log.d(TAG, "Button LED2 Pressed\n");
@@ -247,6 +322,51 @@ public class MainActivity extends AppCompatActivity {
             }
         }else{
             Log.d(TAG, "No BLE permission in toggle LED\n");
+        }
+    }
+
+    private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
+        final Intent intent = new Intent(action);
+        // For all other profiles, writes the data formatted in HEX.
+        final byte[] data = characteristic.getValue();
+        String string;
+        if (data != null && data.length > 0) {
+            final StringBuilder stringBuilder = new StringBuilder(data.length);
+            for(byte byteChar : data)
+                stringBuilder.append(String.format("%02X ", byteChar));
+            string = stringBuilder.toString();
+            debug++;
+        }
+        Log.d(TAG, "Running broadcast update\n");
+        IntentFilter filter = new IntentFilter(action);
+        this.registerReceiver(broadcastUpdateReceiver, filter);
+        sendBroadcast(intent);
+    }
+
+
+    private final BroadcastReceiver broadcastUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            debug++;
+        }
+    };
+
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // Check which request we're responding to
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == READ_DATA) {
+            Log.d(TAG, "Got activity result from read data\n");
+            // Make sure the request was successful
+            if (resultCode == RESULT_OK) {
+                // The user picked a contact.
+                // The Intent's data Uri identifies which contact was selected.
+                debug++;
+                // Do something with the contact here (bigger example below)
+            }
         }
     }
 
