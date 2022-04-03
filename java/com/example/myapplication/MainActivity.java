@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.content.BroadcastReceiver;
@@ -26,6 +27,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -43,12 +48,30 @@ public class MainActivity extends AppCompatActivity {
     BluetoothGatt btGatt3;
     BluetoothGatt btGatt4;
     BluetoothGatt btGatt5;
+    BluetoothDevice btDevice0;
+    BluetoothDevice btDevice1;
+    BluetoothDevice btDevice2;
+    BluetoothDevice btDevice3;
+    BluetoothDevice btDevice4;
+    BluetoothDevice btDevice5;
+    BluetoothServerSocket btServerSocket0;
+    BluetoothServerSocket btServerSocket1;
+    BluetoothServerSocket btServerSocket2;
+    BluetoothServerSocket btServerSocket3;
+    BluetoothServerSocket btServerSocket4;
+    BluetoothServerSocket btServerSocket5;
     BluetoothSocket btSocket0;
     BluetoothSocket btSocket1;
     BluetoothSocket btSocket2;
     BluetoothSocket btSocket3;
     BluetoothSocket btSocket4;
     BluetoothSocket btSocket5;
+    BluetoothSocket btSocket01;
+    BluetoothSocket btSocket11;
+    BluetoothSocket btSocket21;
+    BluetoothSocket btSocket31;
+    BluetoothSocket btSocket41;
+    BluetoothSocket btSocket51;
     private BluetoothGatt btGatt;
     int gattCounter = 0;
     private final int BLUETOOTH_PERMISSION_CODE = 1;
@@ -72,9 +95,18 @@ public class MainActivity extends AppCompatActivity {
     private static final UUID MY_UUID_INSECURE =
             UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final UUID MY_UUID_SECURE = UUID.randomUUID();
+    UUID MY_UUID_INSECURE0;
     public final static String ACTION_GATT_SERVICES_DISCOVERED =
             "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
     public final int READ_DATA = 1;
+    String ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
+    private String receiveBuffer = "";
+    public final static String EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA";
+
+    //threads for comms
+    private AcceptThread InsecureAcceptThread0;
+    private ConnectThread ConnectThread0;
+    private ConnectedThread mConnectedThread0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,11 +151,11 @@ public class MainActivity extends AppCompatActivity {
             closeApp();
         }
 
-        Log.d(TAG, "===> Start Server !");
+        //Log.d(TAG, "===> Start Server !");
         //Log.d(TAG, toString(btDevicesPaired));
-        Intent intent = getIntent();
-        String address = intent.getStringExtra("3CA5518AD35C");
-        startActivity(intent);
+        //Intent intent = getIntent();
+        //String address = intent.getStringExtra("3CA5518AD35C");
+        //startActivity(intent);
         try {
             // This will connect the device with address as passed
             Set<BluetoothDevice> btDevices = btAdapter.getBondedDevices();
@@ -131,21 +163,29 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "socket 0");
                 switch(gattCounter){
                     case(0):
-                        btGatt0 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        btDevice0 = btDevice;
+                        btGatt0 = btDevice.connectGatt(MainActivity.this, false, btGattCallback);
+                        Log.d(TAG, "Connecting device 0");
+                        debug++;
                         break;
                     case(1):
+                        btDevice1 = btDevice;
                         btGatt1 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
                         break;
                     case(2):
+                        btDevice2 = btDevice;
                         btGatt2 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
                         break;
                     case(3):
+                        btDevice3 = btDevice;
                         btGatt3 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
                         break;
                     case(4):
+                        btDevice4 = btDevice;
                         btGatt4 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
                         break;
                     case(5):
+                        btDevice5 = btDevice;
                         btGatt5 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
                         break;
                 }
@@ -191,12 +231,15 @@ public class MainActivity extends AppCompatActivity {
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d(TAG, "onCharacteristicRead SUCCESS");
-                String ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
-                ;
                 broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
             } else {
                 Log.d(TAG, "onCharacteristicRead FAILED");
             }
+        }
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt,
+                                            BluetoothGattCharacteristic characteristic) {
+            broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
         }
     };
 
@@ -257,7 +300,6 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-
     public void ScanBLE(View view) {
         isFirstScan = true;
 
@@ -300,16 +342,19 @@ public class MainActivity extends AppCompatActivity {
                     String unknownCharaString = getResources().
                             getString(R.string.unknown_characteristic);
                     Log.d(TAG, "Button LED1 Pressed\n");
+
+                    writeCharacteristic("hello");
+
+
                     //send toggle message to connection 1
-                    BluetoothGattService Service = testServices.get(0);
-                    uuid = Service.getUuid().toString();
-
-                    Log.d(TAG, "uuid: " + uuid);
-                    List<BluetoothGattCharacteristic> gattCharacteristics = Service.getCharacteristics();
-                    btGatt0.readCharacteristic(gattCharacteristics.get(0));
-                    Log.d(TAG, "chara: " + gattCharacteristics.get(0));
+                    //BluetoothGattService Service = testServices.get(0);
+                    //uuid = Service.getUuid().toString();
+                    //Log.d(TAG, "uuid: " + uuid);
+                    //MY_UUID_INSECURE0 = UUID.fromString(uuid);
+                    //List<BluetoothGattCharacteristic> gattCharacteristics = Service.getCharacteristics();
+                    //btGatt0.readCharacteristic(gattCharacteristics.get(2));
+                    //Log.d(TAG, "chara: " + gattCharacteristics.get(2));
                     debug++;
-
                     break;
                 case (R.id.toggleButton2):
                     Log.d(TAG, "Button LED2 Pressed\n");
@@ -325,16 +370,29 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void writeCharacteristic(String input)
+    {
+        input = "test message\n";
+        try
+        {
+            BluetoothGatt mBluetoothGatt = btGatt0;
+            BluetoothGattService Service = mBluetoothGatt.getService(UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"));
+            BluetoothGattCharacteristic charac = Service.getCharacteristic(UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb"));
+            charac.setValue(input);
+            mBluetoothGatt.writeCharacteristic(charac);
+        }catch (IllegalStateException | NullPointerException e)
+        {
+            Log.e(TAG, "Wrong device, does not contain service/characteristic 0000fee1-0000-1000-8000-00805f9b34fb");
+        }
+    }
+
     private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
         // For all other profiles, writes the data formatted in HEX.
         final byte[] data = characteristic.getValue();
         String string;
         if (data != null && data.length > 0) {
-            final StringBuilder stringBuilder = new StringBuilder(data.length);
-            for(byte byteChar : data)
-                stringBuilder.append(String.format("%02X ", byteChar));
-            string = stringBuilder.toString();
+            intent.putExtra(EXTRA_DATA, new String(data));
             debug++;
         }
         Log.d(TAG, "Running broadcast update\n");
@@ -343,16 +401,20 @@ public class MainActivity extends AppCompatActivity {
         sendBroadcast(intent);
     }
 
-
     private final BroadcastReceiver broadcastUpdateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            debug++;
+            if (ACTION_DATA_AVAILABLE.equals(action)) {
+                receiveBuffer += intent.getStringExtra(EXTRA_DATA);
+                if (receiveBuffer.contains("\n")) {
+                    receiveBuffer = receiveBuffer.substring(0, receiveBuffer.length() - 1);
+                    receiveBuffer = "";
+                }
+            }
+
         }
     };
-
-
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
