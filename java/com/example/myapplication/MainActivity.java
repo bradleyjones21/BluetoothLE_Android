@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     BluetoothGatt btGatt3;
     BluetoothGatt btGatt4;
     BluetoothGatt btGatt5;
+    BluetoothGatt mBluetoothGatt;
     BluetoothDevice btDevice0;
     BluetoothDevice btDevice1;
     BluetoothDevice btDevice2;
@@ -102,11 +103,6 @@ public class MainActivity extends AppCompatActivity {
     String ACTION_DATA_AVAILABLE = "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
     private String receiveBuffer = "";
     public final static String EXTRA_DATA = "com.example.bluetooth.le.EXTRA_DATA";
-
-    //threads for comms
-    private AcceptThread InsecureAcceptThread0;
-    private ConnectThread ConnectThread0;
-    private ConnectedThread mConnectedThread0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -164,13 +160,14 @@ public class MainActivity extends AppCompatActivity {
                 switch(gattCounter){
                     case(0):
                         btDevice0 = btDevice;
-                        btGatt0 = btDevice.connectGatt(MainActivity.this, false, btGattCallback);
+                        btGatt0 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
                         Log.d(TAG, "Connecting device 0");
                         debug++;
                         break;
                     case(1):
                         btDevice1 = btDevice;
                         btGatt1 = btDevice.connectGatt(MainActivity.this, true, btGattCallback);
+                        Log.d(TAG, "Connecting device 1");
                         break;
                     case(2):
                         btDevice2 = btDevice;
@@ -343,8 +340,8 @@ public class MainActivity extends AppCompatActivity {
                             getString(R.string.unknown_characteristic);
                     Log.d(TAG, "Button LED1 Pressed\n");
 
-                    writeCharacteristic("hello");
-
+                    writeCharacteristic("hello1\n", 0);
+                    writeCharacteristic("hello2\n", 1);
 
                     //send toggle message to connection 1
                     //BluetoothGattService Service = testServices.get(0);
@@ -370,12 +367,31 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void writeCharacteristic(String input)
+    public void writeCharacteristic(String input, int sel)
     {
-        input = "test message\n";
+
+        switch(sel){
+            case(0):
+                mBluetoothGatt = btGatt0;
+                break;
+            case(1):
+                mBluetoothGatt = btGatt1;
+                break;
+            case(2):
+                mBluetoothGatt = btGatt2;
+                break;
+            case(3):
+                mBluetoothGatt = btGatt3;
+                break;
+            case(4):
+                mBluetoothGatt = btGatt4;
+                break;
+            case(5):
+                mBluetoothGatt = btGatt5;
+                break;
+        }
         try
         {
-            BluetoothGatt mBluetoothGatt = btGatt0;
             BluetoothGattService Service = mBluetoothGatt.getService(UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"));
             BluetoothGattCharacteristic charac = Service.getCharacteristic(UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb"));
             charac.setValue(input);
