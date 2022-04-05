@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -48,6 +49,12 @@ public class MainActivity extends AppCompatActivity {
     BluetoothGatt btGatt3;
     BluetoothGatt btGatt4;
     BluetoothGatt btGatt5;
+    BluetoothGattCharacteristic mNotifyCharacteristic0;
+    BluetoothGattCharacteristic mNotifyCharacteristic1;
+    BluetoothGattCharacteristic mNotifyCharacteristic2;
+    BluetoothGattCharacteristic mNotifyCharacteristic3;
+    BluetoothGattCharacteristic mNotifyCharacteristic4;
+    BluetoothGattCharacteristic mNotifyCharacteristic5;
     BluetoothGatt mBluetoothGatt;
     BluetoothDevice btDevice0;
     BluetoothDevice btDevice1;
@@ -111,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         btManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        BluetoothAdapter btAdapter = btManager.getAdapter();
+        btAdapter = btManager.getAdapter();
         btScanner = btAdapter.getBluetoothLeScanner();
         Counter = 0;
         for (String permission : PERMISSIONS) {
@@ -202,9 +209,7 @@ public class MainActivity extends AppCompatActivity {
             switch (newState) {
                 case BluetoothProfile.STATE_CONNECTED:
                     Log.d("GattCallback", "connected");
-
                     gatt.discoverServices();
-
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
                     Log.d("GattCallback", "Disconnected");
@@ -215,6 +220,7 @@ public class MainActivity extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 testServices = gatt.getServices();
+                setupNotifications(gatt);
                 debug++;
             } else {
                 Log.w(TAG, "onServicesDiscovered received: " + status);
@@ -239,6 +245,61 @@ public class MainActivity extends AppCompatActivity {
             broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
         }
     };
+
+    private void setupNotifications(BluetoothGatt gatt) {
+        List<BluetoothGattService> gattServices;
+        List<BluetoothGattCharacteristic> gattCharacteristics;
+        String uuid;
+        for (BluetoothGattService gattService : testServices) {
+            gattCharacteristics = gattService.getCharacteristics();
+            for (BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics) {
+                setNotificationForChara(gattCharacteristic, gatt);
+            }
+        }
+    }
+
+    private void setNotificationForChara(BluetoothGattCharacteristic gattCharacteristic, BluetoothGatt gatt) {
+        String uuid = gattCharacteristic.getUuid().toString();
+        if (btAdapter == null || gatt == null) {
+            Log.w(TAG, "BluetoothAdapter not initialized");
+            return;
+        }
+        if(uuid.equals("0000ffe1-0000-1000-8000-00805f9b34fb")){
+            if(btGatt0.equals(gatt) && mNotifyCharacteristic0 == null){
+                setCharacteristicNotification(gattCharacteristic, true, gatt);
+                mNotifyCharacteristic0 = gattCharacteristic;
+            }else if(btGatt1.equals(gatt) && mNotifyCharacteristic1 == null){
+                setCharacteristicNotification(gattCharacteristic, true, gatt);
+                mNotifyCharacteristic1 = gattCharacteristic;
+            }else if(btGatt2.equals(gatt) && mNotifyCharacteristic2 == null){
+                setCharacteristicNotification(gattCharacteristic, true, gatt);
+                mNotifyCharacteristic2 = gattCharacteristic;
+            }else if(btGatt3.equals(gatt) && mNotifyCharacteristic3 == null){
+                setCharacteristicNotification(gattCharacteristic, true, gatt);
+                mNotifyCharacteristic3 = gattCharacteristic;
+            }else if(btGatt4.equals(gatt) && mNotifyCharacteristic4 == null){
+                setCharacteristicNotification(gattCharacteristic, true, gatt);
+                mNotifyCharacteristic4 = gattCharacteristic;
+            }else if(btGatt5.equals(gatt) && mNotifyCharacteristic5 == null){
+                setCharacteristicNotification(gattCharacteristic, true, gatt);
+                mNotifyCharacteristic5 = gattCharacteristic;
+            }
+        }
+    }
+
+    public void setCharacteristicNotification(BluetoothGattCharacteristic characteristic,
+                                              boolean enabled, BluetoothGatt mBluetoothGattRec) {
+        mBluetoothGattRec.setCharacteristicNotification(characteristic, enabled);
+        if (UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb").equals(characteristic.getUuid())) {
+            for (BluetoothGattDescriptor descriptor:characteristic.getDescriptors()){
+                Log.d(TAG, "BluetoothGattDescriptor: "+descriptor.getUuid().toString());
+            }
+            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
+            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            mBluetoothGattRec.writeDescriptor(descriptor);
+        }
+    }
+
 
     public void enableBT() {
         if (btAdapter == null) {
@@ -286,12 +347,10 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     case BluetoothAdapter.STATE_ON:
                         Log.d(TAG, "STATE_ON\n");
-
                         break;
                     case BluetoothAdapter.STATE_TURNING_ON:
                         Log.d(TAG, "STATE_TURNING_ON\n");
                         break;
-
                 }
             }
         }
@@ -425,12 +484,18 @@ public class MainActivity extends AppCompatActivity {
                 receiveBuffer += intent.getStringExtra(EXTRA_DATA);
                 if (receiveBuffer.contains("\n")) {
                     receiveBuffer = receiveBuffer.substring(0, receiveBuffer.length() - 1);
+                    messageHandler();
                     receiveBuffer = "";
                 }
             }
-
         }
     };
+
+    private void messageHandler() {
+        if (receiveBuffer != null) {
+            debug++;
+        }
+    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
