@@ -21,6 +21,8 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -28,11 +30,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     BluetoothLeScanner btScanner;
     BluetoothAdapter btAdapter;
     List<BluetoothGattService> testServices;
+    int connectionCounter = 0;
     BluetoothGatt btGatt0;
     BluetoothGatt btGatt1;
     BluetoothGatt btGatt2;
@@ -81,6 +79,16 @@ public class MainActivity extends AppCompatActivity {
     BluetoothSocket btSocket41;
     BluetoothSocket btSocket51;
     private BluetoothGatt btGatt;
+    intervalThread iThread;
+    reactionThread rThread;
+    Button intervalModeButton;
+    Button reactionModeButton;
+    Button exitModeButton;
+    TextView modeText;
+    TextView missesText;
+    TextView reactionText;
+    TextView connectedDevicesText;
+    TextView scoreText;
     int gattCounter = 0;
     private final int BLUETOOTH_PERMISSION_CODE = 1;
     public final boolean PAIRING = false;
@@ -117,6 +125,15 @@ public class MainActivity extends AppCompatActivity {
         int Counter; //used to index an array to copy over the permissions that need approval
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        modeText = (TextView) findViewById(R.id.modeText);
+        missesText = (TextView) findViewById(R.id.missesText);
+        reactionText = (TextView) findViewById(R.id.reactionText);
+        connectedDevicesText = (TextView) findViewById(R.id.connectedDevicesText);
+        scoreText = (TextView) findViewById(R.id.scoreText);
+        intervalModeButton = (Button) findViewById(R.id.intervalModeButton);
+        reactionModeButton = (Button) findViewById(R.id.reactionModeButton);
+        exitModeButton = (Button) findViewById(R.id.exitModeButton);
+        exitModeButton.setEnabled(false);
         btManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         btAdapter = btManager.getAdapter();
         btScanner = btAdapter.getBluetoothLeScanner();
@@ -209,10 +226,24 @@ public class MainActivity extends AppCompatActivity {
             switch (newState) {
                 case BluetoothProfile.STATE_CONNECTED:
                     Log.d("GattCallback", "connected");
+                    connectionCounter++;
+                    connectedDevicesText.post(new Runnable(){
+                        @Override
+                        public void run(){
+                            connectedDevicesText.setText(new Integer(connectionCounter).toString());
+                        }
+                    });
                     gatt.discoverServices();
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
                     Log.d("GattCallback", "Disconnected");
+                    connectionCounter--;
+                    connectedDevicesText.post(new Runnable(){
+                        @Override
+                        public void run(){
+                            connectedDevicesText.setText(new Integer(connectionCounter).toString());
+                        }
+                    });
                     break;
             }
         }
@@ -384,48 +415,6 @@ public class MainActivity extends AppCompatActivity {
         //here we need to scan for the JDY16's and connect them
     }
 
-    public void ToggleLED(View view) {
-        String uuid = null;
-        if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
-                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
-                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
-
-            //Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
-            switch (view.getId()) {
-                case (R.id.toggleButton):
-                    HashMap<String, String> currentCharaData =
-                            new HashMap<String, String>();
-                    String unknownCharaString = getResources().
-                            getString(R.string.unknown_characteristic);
-                    Log.d(TAG, "Button LED1 Pressed\n");
-
-                    writeCharacteristic("hello1\n", 0);
-                    writeCharacteristic("hello2\n", 1);
-
-                    //send toggle message to connection 1
-                    //BluetoothGattService Service = testServices.get(0);
-                    //uuid = Service.getUuid().toString();
-                    //Log.d(TAG, "uuid: " + uuid);
-                    //MY_UUID_INSECURE0 = UUID.fromString(uuid);
-                    //List<BluetoothGattCharacteristic> gattCharacteristics = Service.getCharacteristics();
-                    //btGatt0.readCharacteristic(gattCharacteristics.get(2));
-                    //Log.d(TAG, "chara: " + gattCharacteristics.get(2));
-                    debug++;
-                    break;
-                case (R.id.toggleButton2):
-                    Log.d(TAG, "Button LED2 Pressed\n");
-                    //send toggle message to connection 2
-                    break;
-                case (R.id.toggleButton3):
-                    Log.d(TAG, "Button LED3 Pressed\n");
-                    //send toggle message to connection 3
-                    break;
-            }
-        }else{
-            Log.d(TAG, "No BLE permission in toggle LED\n");
-        }
-    }
-
     public void writeCharacteristic(String input, int sel)
     {
 
@@ -536,6 +525,58 @@ public class MainActivity extends AppCompatActivity {
         } else {
             //closeApp();
         }
+    }
+
+    public void intervalMode(View view) {
+
+        Log.d(TAG, "Button intervalMode Pressed\n");
+        modeText.setText("Interval");
+        reactionModeButton.setEnabled(false);
+        intervalModeButton.setEnabled(false);
+        exitModeButton.setEnabled(true);
+        iThread = new intervalThread();
+        iThread.start();
+    }
+    public void reactionMode(View view) {
+
+        Log.d(TAG, "Button reactionMode Pressed\n");
+        modeText.setText("Reaction");
+        intervalModeButton.setEnabled(false);
+        reactionModeButton.setEnabled(false);
+        exitModeButton.setEnabled(true);
+        rThread = new reactionThread();
+        rThread.start();
+    }
+    public void exitMode(View view) {
+
+        Log.d(TAG, "Button exitMode Pressed\n");
+        modeText.setText("");
+        reactionModeButton.setEnabled(true);
+        intervalModeButton.setEnabled(true);
+        exitModeButton.setEnabled(false);
+
+    }
+
+    class intervalThread extends Thread {
+        intervalThread() {
+
+        }
+
+        public void run() {
+            Log.d(TAG, "Thread ran interval\n");
+        }
+
+    }
+
+    class reactionThread extends Thread {
+        reactionThread() {
+
+        }
+
+        public void run() {
+            Log.d(TAG, "Thread ran reaction\n");
+        }
+
     }
 
     public void closeApp() {
