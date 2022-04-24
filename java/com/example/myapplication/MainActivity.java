@@ -30,6 +30,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -60,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     BluetoothDevice btDevice3;
     BluetoothDevice btDevice4;
     BluetoothDevice btDevice5;
+    List<Integer> devicePointer = new ArrayList<>(Arrays.asList(0,0,0,0,0,0));
     BluetoothServerSocket btServerSocket0;
     BluetoothServerSocket btServerSocket1;
     BluetoothServerSocket btServerSocket2;
@@ -81,6 +84,8 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothGatt btGatt;
     intervalThread iThread;
     reactionThread rThread;
+    boolean intervalThreadOn = false;
+    boolean reactionThreadOn = false;
     Button intervalModeButton;
     Button reactionModeButton;
     Button exitModeButton;
@@ -89,6 +94,8 @@ public class MainActivity extends AppCompatActivity {
     TextView reactionText;
     TextView connectedDevicesText;
     TextView scoreText;
+    TextView debugText;
+    String receiveTemp = "";
     int gattCounter = 0;
     private final int BLUETOOTH_PERMISSION_CODE = 1;
     public final boolean PAIRING = false;
@@ -128,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
         modeText = (TextView) findViewById(R.id.modeText);
         missesText = (TextView) findViewById(R.id.missesText);
         reactionText = (TextView) findViewById(R.id.reactionText);
+        debugText = (TextView) findViewById(R.id.debugText);
         connectedDevicesText = (TextView) findViewById(R.id.connectedDevicesText);
         scoreText = (TextView) findViewById(R.id.scoreText);
         intervalModeButton = (Button) findViewById(R.id.intervalModeButton);
@@ -227,6 +235,19 @@ public class MainActivity extends AppCompatActivity {
                 case BluetoothProfile.STATE_CONNECTED:
                     Log.d("GattCallback", "connected");
                     connectionCounter++;
+                    if(btGatt0.equals(gatt)){
+                        devicePointer.set(0, 1);
+                    }else if(btGatt1.equals(gatt)){
+                        devicePointer.set(1, 1);
+                    }else if(btGatt2.equals(gatt)){
+                        devicePointer.set(2, 1);
+                    }else if(btGatt3.equals(gatt)){
+                        devicePointer.set(3, 1);
+                    }else if(btGatt4.equals(gatt)){
+                        devicePointer.set(4, 1);
+                    }else if(btGatt5.equals(gatt)){
+                        devicePointer.set(5, 1);
+                    }
                     connectedDevicesText.post(new Runnable(){
                         @Override
                         public void run(){
@@ -238,6 +259,19 @@ public class MainActivity extends AppCompatActivity {
                 case BluetoothProfile.STATE_DISCONNECTED:
                     Log.d("GattCallback", "Disconnected");
                     connectionCounter--;
+                    if(btGatt0.equals(gatt)){
+                        devicePointer.set(0, 0);
+                    }else if(btGatt1.equals(gatt)){
+                        devicePointer.set(1, 0);
+                    }else if(btGatt2.equals(gatt)){
+                        devicePointer.set(2, 0);
+                    }else if(btGatt3.equals(gatt)){
+                        devicePointer.set(3, 0);
+                    }else if(btGatt4.equals(gatt)){
+                        devicePointer.set(4, 0);
+                    }else if(btGatt5.equals(gatt)){
+                        devicePointer.set(5, 0);
+                    }
                     connectedDevicesText.post(new Runnable(){
                         @Override
                         public void run(){
@@ -387,34 +421,6 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    public void ScanBLE(View view) {
-        isFirstScan = true;
-
-        Log.d(TAG, "Button ScanBLE Pressed\n");
-        if (!btAdapter.isEnabled()) {
-            enableBT();
-        }
-        Log.d(TAG, "Looking for unpaired devices\n");
-        if ((ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED) &&
-                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) &&
-                (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
-            if (btAdapter.isDiscovering()) {
-                btAdapter.cancelDiscovery();
-                Log.d(TAG, "Cancelling discovery\n");
-            }
-            Set<BluetoothDevice> btDevicesPaired = btAdapter.getBondedDevices();
-            Log.d(TAG, "Starting discovery\n");
-
-            //IntentFilter pairDeviceIntent = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
-            //registerReceiver(PairingRequest, pairDeviceIntent);
-        } else {
-            Log.d(TAG, "No scanning permission\n");
-        }
-
-
-        //here we need to scan for the JDY16's and connect them
-    }
-
     public void writeCharacteristic(String input, int sel)
     {
 
@@ -471,8 +477,18 @@ public class MainActivity extends AppCompatActivity {
             String action = intent.getAction();
             if (ACTION_DATA_AVAILABLE.equals(action)) {
                 receiveBuffer += intent.getStringExtra(EXTRA_DATA);
-                if (receiveBuffer.contains("\n")) {
+                Log.d(TAG, "receive: " + receiveBuffer);
+                if (receiveBuffer.contains("\n") && !reactionThreadOn && !intervalThreadOn) {
                     receiveBuffer = receiveBuffer.substring(0, receiveBuffer.length() - 1);
+                    receiveTemp = receiveBuffer;
+                    Log.d(TAG, "receive: " + receiveBuffer);
+                    debugText.post(new Runnable(){
+                        @Override
+                        public void run(){
+                            debugText.setText(receiveTemp);
+                            Log.d(TAG, "wrote to debugText");
+                        }
+                    });
                     messageHandler();
                     receiveBuffer = "";
                 }
@@ -534,6 +550,7 @@ public class MainActivity extends AppCompatActivity {
         reactionModeButton.setEnabled(false);
         intervalModeButton.setEnabled(false);
         exitModeButton.setEnabled(true);
+        intervalThreadOn = true;
         iThread = new intervalThread();
         iThread.start();
     }
@@ -544,6 +561,7 @@ public class MainActivity extends AppCompatActivity {
         intervalModeButton.setEnabled(false);
         reactionModeButton.setEnabled(false);
         exitModeButton.setEnabled(true);
+        reactionThreadOn = true;
         rThread = new reactionThread();
         rThread.start();
     }
@@ -551,10 +569,15 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "Button exitMode Pressed\n");
         modeText.setText("");
+        if (reactionThreadOn == true){
+            rThread.interrupt();
+        }else if (intervalThreadOn == true){
+            iThread.interrupt();
+        }
+
         reactionModeButton.setEnabled(true);
         intervalModeButton.setEnabled(true);
         exitModeButton.setEnabled(false);
-
     }
 
     class intervalThread extends Thread {
@@ -563,9 +586,19 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
+            intervalThreadOn = true;
             Log.d(TAG, "Thread ran interval\n");
+            while(true){
+                try {
+                    Log.d(TAG, "interval running...\n");
+                    sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    intervalThreadOn = false;
+                    break;
+                }
+            }
         }
-
     }
 
     class reactionThread extends Thread {
@@ -574,9 +607,49 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
+            int rand;
+            reactionThreadOn = true;
             Log.d(TAG, "Thread ran reaction\n");
-        }
 
+            //set up devices to be able to be pointed to by rand
+
+            while(true){
+                rand = (int) (Math.random() * 6);
+                Log.d(TAG, "reaction rand: " + rand);
+                if (devicePointer.get(rand)==1){
+                    Log.d(TAG, "reaction rand accepted: " + rand + " now send message");
+                    writeCharacteristic("REAC", rand);
+                    while(true) {
+                        if (receiveBuffer.contains("\n")) {
+                            receiveBuffer = receiveBuffer.substring(0, receiveBuffer.length() - 1);
+                            receiveTemp = receiveBuffer;
+                            Log.d(TAG, "receive in thread: " + receiveBuffer);
+                            debugText.post(new Runnable(){
+                                @Override
+                                public void run(){
+                                    debugText.setText(receiveTemp);
+                                    Log.d(TAG, "wrote to debugText");
+                                }
+                            });
+                            if(receiveBuffer == "MISS"){
+                                //perform tasks required for a miss
+                                Log.d(TAG, "missed target");
+                            }
+                            receiveBuffer = "";
+                        }
+                        if(rThread.isInterrupted()){
+                            reactionThreadOn = false;
+                            break;
+                        }
+                    }
+                }
+                if(rThread.isInterrupted()){
+                    reactionThreadOn = false;
+                    break;
+                }
+
+            }
+        }
     }
 
     public void closeApp() {
